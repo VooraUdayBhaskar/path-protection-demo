@@ -1,0 +1,90 @@
+name: Path Protection
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  path-protection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          echo "Getting files changed in this PR..."
+          CHANGED_FILES=$(git diff --name-only origin/main..HEAD)
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "Files changed:"
+          echo "$CHANGED_FILES"
+
+      - name: Check if user is admin
+        id: check-admin
+        run: |
+          USER="${{ github.actor }}"
+          echo "Checking if $USER is in admin team..."
+          
+          # Check if user is in admin team
+          if gh api "orgs/${{ github.repository_owner }}/teams/admin-team/memberships/$USER" --silent 2>/dev/null; then
+            echo "is_admin=true" >> $GITHUB_OUTPUT
+            echo "✅ $USER is an admin - can access all folders"
+          else
+            echo "is_admin=false" >> $GITHUB_OUTPUT  
+            echo "👤 $USER is a developer - restricted access"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate path access for developers
+        if: steps.check-admin.outputs.is_admin == 'false'
+        run: |
+          echo "🔒 Checking developer access restrictions..."
+          
+          # Define sensitive paths that devs cannot access
+          SENSITIVE_PATHS=(
+            "sensitive-configs/"
+            "scripts/deployment/"
+            "production.yml"
+            "secrets/"
+            "*.prod.env"
+          )
+          
+          VIOLATIONS=""
+          
+          # Check each changed file against sensitive paths
+          while IFS= read -r file; do
+            if [[ -n "$file" ]]; then
+              for pattern in "${SENSITIVE_PATHS[@]}"; do
+                if [[ "$file" == $pattern* ]] || [[ "$file" == *"$pattern"* ]]; then
+                  echo "❌ VIOLATION: $file matches restricted pattern: $pattern"
+                  VIOLATIONS="$VIOLATIONS\n- $file"
+                fi
+              done
+            fi
+          done <<< "${{ steps.changed-files.outputs.changed_files }}"
+          
+          # If violations found, block the PR
+          if [[ -n "$VIOLATIONS" ]]; then
+            echo "🚫 ACCESS DENIED: Developers cannot modify sensitive paths"
+            echo -e "Restricted files in this PR:$VIOLATIONS"
+            echo ""
+            echo "📝 These files require admin team approval:"
+            echo "   - Ask an admin to create this PR, or"  
+            echo "   - Request admin review and approval"
+            exit 1
+          fi
+          
+          echo "✅ All changed files are accessible to developers"
+
+      - name: Admin access confirmation
+        if: steps.check-admin.outputs.is_admin == 'true'
+        run: |
+          echo "🔓 Admin user - no path restrictions apply"
+          echo "Files that will be modified:"
+          echo "${{ steps.changed-files.outputs.changed_files }}"
