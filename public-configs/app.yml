@@ -3,3 +3,4 @@ app_name: demo-app
 environment: development
 
 debug: true
+new_feature: enabled
