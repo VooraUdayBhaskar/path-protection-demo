@@ -7,6 +7,7 @@ jobs:
   path-protection:
     runs-on: ubuntu-latest
     steps:
+    
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -34,21 +35,21 @@ jobs:
           USER="${{ github.actor }}"
           echo "Checking access level for user: $USER"
           
-          # Define admin users (for now, making you a developer to test restrictions)
-          ADMIN_USERS=("AdminUserExample" "AnotherAdmin")
+          # Define admin users (for now, I am developer to test restrictions)
+          ADMIN_USERS=("admin1" "VooraUdayBhaskar" "admin2")
           
           if [[ " ${ADMIN_USERS[@]} " =~ " ${USER} " ]]; then
             echo "is_admin=true" >> $GITHUB_OUTPUT
-            echo "✅ $USER is an admin - can access all folders"
+            echo "$USER is an admin - can access all folders"
           else
             echo "is_admin=false" >> $GITHUB_OUTPUT  
-            echo "🔒 $USER is a developer - restricted access to sensitive folders"
+            echo " $USER is a developer - restricted access to sensitive folders"
           fi
 
       - name: Validate developer access restrictions
         if: steps.check-admin.outputs.is_admin == 'false'
         run: |
-          echo "🔒 Applying developer access restrictions..."
+          echo "Applying developer access restrictions..."
           
           # Define sensitive paths that developers cannot modify
           SENSITIVE_PATHS=(
@@ -67,7 +68,7 @@ jobs:
               echo "Checking file: $file"
               for pattern in "${SENSITIVE_PATHS[@]}"; do
                 if [[ "$file" == $pattern* ]] || [[ "$file" == *"$pattern"* ]]; then
-                  echo "❌ VIOLATION: $file matches restricted pattern: $pattern"
+                  echo " VIOLATION: $file matches restricted pattern: $pattern"
                   VIOLATIONS="$VIOLATIONS\n- $file (matches pattern: $pattern)"
                 fi
               done
@@ -77,16 +78,16 @@ jobs:
           # If violations found, block the PR
           if [[ -n "$VIOLATIONS" ]]; then
             echo ""
-            echo "🚫 ACCESS DENIED: Developers cannot modify sensitive paths"
+            echo " ACCESS DENIED: Developers cannot modify sensitive paths"
             echo "=============================================="
-            echo -e "❌ Restricted files in this PR:$VIOLATIONS"
+            echo -e "Restricted files in this PR:$VIOLATIONS"
             echo ""
-            echo "📝 To resolve this issue:"
+            echo " To resolve this issue:"
             echo "   1. Remove changes to sensitive files from your PR, OR"
             echo "   2. Ask an admin to create this PR instead, OR"
             echo "   3. Move sensitive changes to a separate admin-only PR"
             echo ""
-            echo "✅ You CAN modify files in:"
+            echo " You CAN modify files in:"
             echo "   - public-configs/"
             echo "   - scripts/dev-tools/"
             echo "   - README.md and documentation"
@@ -94,13 +95,13 @@ jobs:
             exit 1
           fi
           
-          echo "✅ All changed files are accessible to developers"
-          echo "🎉 PR approved for developer access level"
+          echo " All changed files are accessible to developers"
+          echo " PR approved for developer access level"
 
       - name: Admin access confirmation
         if: steps.check-admin.outputs.is_admin == 'true'
         run: |
-          echo "🔓 Admin user detected - no path restrictions apply"
+          echo "Admin user detected - no path restrictions apply"
           echo "Admin can modify any files including:"
           echo "- sensitive-configs/"
           echo "- scripts/deployment/"
