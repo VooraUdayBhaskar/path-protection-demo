@@ -1,4 +1,4 @@
-name: Path Protection
+name: Path Protection - Developer Test
 on:
   pull_request:
     branches: [main]
@@ -12,6 +12,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch main branch
+        run: |
+          git fetch origin main
+
       - name: Get changed files
         id: changed-files
         run: |
@@ -21,32 +25,32 @@ jobs:
           echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
-          echo "Files changed:"
+          echo "Files changed in this PR:"
           echo "$CHANGED_FILES"
 
       - name: Check if user is admin
         id: check-admin
         run: |
           USER="${{ github.actor }}"
-          echo "Checking if $USER is in admin team..."
+          echo "Checking access level for user: $USER"
           
-          # Check if user is in admin team
-          if gh api "orgs/${{ github.repository_owner }}/teams/admin-team/memberships/$USER" --silent 2>/dev/null; then
+          # Define admin users (for now, making you a developer to test restrictions)
+          ADMIN_USERS=("AdminUserExample" "AnotherAdmin")
+          
+          if [[ " ${ADMIN_USERS[@]} " =~ " ${USER} " ]]; then
             echo "is_admin=true" >> $GITHUB_OUTPUT
             echo "✅ $USER is an admin - can access all folders"
           else
             echo "is_admin=false" >> $GITHUB_OUTPUT  
-            echo "👤 $USER is a developer - restricted access"
+            echo "🔒 $USER is a developer - restricted access to sensitive folders"
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate path access for developers
+      - name: Validate developer access restrictions
         if: steps.check-admin.outputs.is_admin == 'false'
         run: |
-          echo "🔒 Checking developer access restrictions..."
+          echo "🔒 Applying developer access restrictions..."
           
-          # Define sensitive paths that devs cannot access
+          # Define sensitive paths that developers cannot modify
           SENSITIVE_PATHS=(
             "sensitive-configs/"
             "scripts/deployment/"
@@ -60,10 +64,11 @@ jobs:
           # Check each changed file against sensitive paths
           while IFS= read -r file; do
             if [[ -n "$file" ]]; then
+              echo "Checking file: $file"
               for pattern in "${SENSITIVE_PATHS[@]}"; do
                 if [[ "$file" == $pattern* ]] || [[ "$file" == *"$pattern"* ]]; then
                   echo "❌ VIOLATION: $file matches restricted pattern: $pattern"
-                  VIOLATIONS="$VIOLATIONS\n- $file"
+                  VIOLATIONS="$VIOLATIONS\n- $file (matches pattern: $pattern)"
                 fi
               done
             fi
@@ -71,20 +76,35 @@ jobs:
           
           # If violations found, block the PR
           if [[ -n "$VIOLATIONS" ]]; then
-            echo "🚫 ACCESS DENIED: Developers cannot modify sensitive paths"
-            echo -e "Restricted files in this PR:$VIOLATIONS"
             echo ""
-            echo "📝 These files require admin team approval:"
-            echo "   - Ask an admin to create this PR, or"  
-            echo "   - Request admin review and approval"
+            echo "🚫 ACCESS DENIED: Developers cannot modify sensitive paths"
+            echo "=============================================="
+            echo -e "❌ Restricted files in this PR:$VIOLATIONS"
+            echo ""
+            echo "📝 To resolve this issue:"
+            echo "   1. Remove changes to sensitive files from your PR, OR"
+            echo "   2. Ask an admin to create this PR instead, OR"
+            echo "   3. Move sensitive changes to a separate admin-only PR"
+            echo ""
+            echo "✅ You CAN modify files in:"
+            echo "   - public-configs/"
+            echo "   - scripts/dev-tools/"
+            echo "   - README.md and documentation"
+            echo "=============================================="
             exit 1
           fi
           
           echo "✅ All changed files are accessible to developers"
+          echo "🎉 PR approved for developer access level"
 
       - name: Admin access confirmation
         if: steps.check-admin.outputs.is_admin == 'true'
         run: |
-          echo "🔓 Admin user - no path restrictions apply"
-          echo "Files that will be modified:"
+          echo "🔓 Admin user detected - no path restrictions apply"
+          echo "Admin can modify any files including:"
+          echo "- sensitive-configs/"
+          echo "- scripts/deployment/"
+          echo "- All other folders"
+          echo ""
+          echo "Files that will be modified in this PR:"
           echo "${{ steps.changed-files.outputs.changed_files }}"
