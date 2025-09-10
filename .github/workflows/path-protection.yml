@@ -36,7 +36,7 @@ jobs:
           echo "Checking access level for user: $USER"
           
           # Define admin users (for now, I am developer to test restrictions)
-          ADMIN_USERS=("admin1" "VooraUdayBhaskar" "admin2")
+          ADMIN_USERS=("admin1" "uday" "admin2")
           
           if [[ " ${ADMIN_USERS[@]} " =~ " ${USER} " ]]; then
             echo "is_admin=true" >> $GITHUB_OUTPUT
@@ -51,7 +51,7 @@ jobs:
         run: |
           echo "Applying developer access restrictions..."
           
-          # Define sensitive paths that developers cannot modify
+          #sensitive paths that developers cannot modify
           SENSITIVE_PATHS=(
             "sensitive-configs/"
             "scripts/deployment/"
