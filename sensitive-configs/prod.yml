@@ -2,3 +2,8 @@ database_url: postgres://prod-server:5432/app
 api_key: sk-prod-12345-secret
 oidc_client_id: prod-client-id-12345
 oidc_client_secret: super-secret-key-67890
+
+# DEVELOPER TEST: Attempting to modify production secrets
+unauthorized_secret: developer-shouldnt-add-this
+production_api_key: dev-trying-to-access-prod
+critical_password: developer-unauthorized-change
