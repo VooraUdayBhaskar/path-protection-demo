@@ -55,7 +55,6 @@ jobs:
           PROTECTED_PATHS=(
             "protective-configs/"
             "scripts/deployment/"
-            "production.yml"
             "secrets/"
           )
           
