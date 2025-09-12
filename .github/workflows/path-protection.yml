@@ -43,7 +43,7 @@ jobs:
             echo "$USER is an admin - can access all folders"
           else
             echo "is_admin=false" >> $GITHUB_OUTPUT  
-            echo " $USER is a developer - restricted access to protective folders"
+            echo " $USER is a developer - restricted access to protected folders"
           fi
 
       - name: Validate developer access restrictions
@@ -51,9 +51,9 @@ jobs:
         run: |
           echo "Applying developer access restrictions..."
           
-          # Define protective paths that developers cannot modify
+          # Define protected paths that developers cannot modify
           PROTECTED_PATHS=(
-            "protective-configs/"
+            "protected-configs/"
             "scripts/deployment/"
             "secrets/"
           )
@@ -101,7 +101,7 @@ jobs:
         run: |
           echo "Admin user detected - no path restrictions apply"
           echo "Admin can modify any files including:"
-          echo "- protective-configs/"
+          echo "- protected-configs/"
           echo "- scripts/deployment/"
           echo "- All other folders"
           echo ""
