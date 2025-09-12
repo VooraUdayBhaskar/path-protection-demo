@@ -36,7 +36,7 @@ jobs:
           echo "Checking access level for user: $USER"
           
           #Admin list 
-          ADMIN_USERS=("admin1" "admin2")
+          ADMIN_USERS=("admin1" "VooraUdayBhaskar" "admin2")
           
           if [[ " ${ADMIN_USERS[@]} " =~ " ${USER} " ]]; then
             echo "is_admin=true" >> $GITHUB_OUTPUT
