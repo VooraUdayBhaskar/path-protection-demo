@@ -53,7 +53,7 @@ jobs:
           
           # Define protective paths that developers cannot modify
           PROTECTED_PATHS=(
-            "sensitive-configs/"
+            "protective-configs/"
             "scripts/deployment/"
             "production.yml"
             "secrets/"
@@ -102,7 +102,7 @@ jobs:
         run: |
           echo "Admin user detected - no path restrictions apply"
           echo "Admin can modify any files including:"
-          echo "- sensitive-configs/"
+          echo "- protective-configs/"
           echo "- scripts/deployment/"
           echo "- All other folders"
           echo ""
