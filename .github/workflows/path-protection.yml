@@ -29,25 +29,57 @@ jobs:
           echo "Files changed in this PR:"
           echo "$CHANGED_FILES"
 
-      - name: Check if user is admin
-        id: check-admin
+      - name: Check user team membership
+        id: check-permissions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           USER="${{ github.actor }}"
-          echo "Checking access level for user: $USER"
+          ORG="${{ github.repository_owner }}"
+          echo "Checking team membership for user: $USER in org: $ORG"
           
-          #Admin list 
-          ADMIN_USERS=("admin1" "VooraUdayBhaskar" "admin2")
+          # Check if user is in admin team
+          ADMIN_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/orgs/$ORG/teams/admins/members/$USER" \
+            -w "%{http_code}")
           
-          if [[ " ${ADMIN_USERS[@]} " =~ " ${USER} " ]]; then
+          # GitHub API returns 204 if user is in team, 404 if not
+          if [[ "$ADMIN_CHECK" == *"204"* ]]; then
             echo "is_admin=true" >> $GITHUB_OUTPUT
-            echo "$USER is an admin - can access all folders"
+            echo "$USER is in the 'admins' team - full access granted"
           else
-            echo "is_admin=false" >> $GITHUB_OUTPUT  
-            echo " $USER is a developer - restricted access to protected folders"
+            echo "is_admin=false" >> $GITHUB_OUTPUT
+            echo "$USER is not in 'admins' team - checking developer permissions"
+            
+            # Check if user is in developers team
+            DEV_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/orgs/$ORG/teams/developers/members/$USER" \
+              -w "%{http_code}")
+            
+            if [[ "$DEV_CHECK" == *"204"* ]]; then
+              echo "is_developer=true" >> $GITHUB_OUTPUT
+              echo "$USER is in 'developers' team - restricted access"
+            else
+              echo "is_developer=false" >> $GITHUB_OUTPUT
+              echo "WARNING: $USER is not in any recognized team"
+            fi
+          fi
+
+      - name: Validate team membership
+        run: |
+          if [[ "${{ steps.check-permissions.outputs.is_admin }}" != "true" ]] && \
+             [[ "${{ steps.check-permissions.outputs.is_developer }}" != "true" ]]; then
+            echo "❌ ERROR: User ${{ github.actor }} is not in any authorized team"
+            echo "Please ensure you are added to either:"
+            echo "  - 'admins' team (full access)"
+            echo "  - 'developers' team (restricted access)"
+            echo ""
+            echo "Contact your organization admin to add you to appropriate teams."
+            exit 1
           fi
 
       - name: Validate developer access restrictions
-        if: steps.check-admin.outputs.is_admin == 'false'
+        if: steps.check-permissions.outputs.is_admin == 'false' && steps.check-permissions.outputs.is_developer == 'true'
         run: |
           echo "Applying developer access restrictions..."
           
@@ -56,17 +88,18 @@ jobs:
             "protected-configs/"
             "scripts/deployment/"
             "secrets/"
+            ".github/workflows/"
           )
           
           VIOLATIONS=""
           
-          # Check each changed file against PROTECTED paths
+          # Check each changed file against protected paths
           while IFS= read -r file; do
             if [[ -n "$file" ]]; then
               echo "Checking file: $file"
               for pattern in "${PROTECTED_PATHS[@]}"; do
                 if [[ "$file" == $pattern* ]] || [[ "$file" == *"$pattern"* ]]; then
-                  echo " VIOLATION: $file matches restricted pattern: $pattern"
+                  echo "⚠️  VIOLATION: $file matches restricted pattern: $pattern"
                   VIOLATIONS="$VIOLATIONS\n- $file (matches pattern: $pattern)"
                 fi
               done
@@ -76,34 +109,42 @@ jobs:
           # If violations found, block the PR
           if [[ -n "$VIOLATIONS" ]]; then
             echo ""
-            echo " ACCESS DENIED: Developers cannot modify PROTECTED paths content"
+            echo "🚫 ACCESS DENIED: Developers cannot modify PROTECTED paths"
             echo "=============================================="
             echo -e "Restricted files in this PR:$VIOLATIONS"
             echo ""
-            echo " To resolve this issue:"
+            echo "📋 To resolve this issue:"
             echo "   1. Remove changes to PROTECTED files from your PR, OR"
-            echo "   2. Ask an admin to create this PR instead, OR"
-            echo "   3. Move changes IN PROTECTED FOLDER to a separate admin-only PR"
+            echo "   2. Ask an admin team member to create this PR instead, OR"
+            echo "   3. Move changes to protected folders into a separate admin-only PR"
             echo ""
-            echo " You CAN modify files in:"
+            echo "✅ You CAN modify files in:"
             echo "   - public-configs/"
             echo "   - scripts/dev-tools/"
-            echo "   - README.md and documentation"
+            echo "   - src/, docs/, README.md and documentation"
+            echo "   - Most application code outside protected areas"
             echo "=============================================="
             exit 1
           fi
           
-          echo " All changed files are accessible to developers"
-          echo " PR approved for developer access level"
+          echo "✅ All changed files are accessible to developers"
+          echo "📝 PR approved for developer access level"
 
       - name: Admin access confirmation
-        if: steps.check-admin.outputs.is_admin == 'true'
+        if: steps.check-permissions.outputs.is_admin == 'true'
         run: |
-          echo "Admin user detected - no path restrictions apply"
-          echo "Admin can modify any files including:"
-          echo "- protected-configs/"
-          echo "- scripts/deployment/"
-          echo "- All other folders"
+          echo "🔐 Admin team member detected - no path restrictions apply"
           echo ""
-          echo "Files that will be modified in this PR:"
-          echo "${{ steps.changed-files.outputs.changed_files }}"
+          echo "✅ Admin can modify any files including:"
+          echo "   - protected-configs/"
+          echo "   - scripts/deployment/"
+          echo "   - secrets/"
+          echo "   - .github/workflows/"
+          echo "   - All other folders"
+          echo ""
+          echo "📁 Files that will be modified in this PR:"
+          while IFS= read -r file; do
+            if [[ -n "$file" ]]; then
+              echo "   - $file"
+            fi
+          done <<< "${{ steps.changed-files.outputs.changed_files }}"
