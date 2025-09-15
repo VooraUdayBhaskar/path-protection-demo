@@ -36,39 +36,53 @@ jobs:
         run: |
           USER="${{ github.actor }}"
           ORG="${{ github.repository_owner }}"
-          echo "Checking team membership for user: $USER in org: $ORG"
+          echo "Checking permissions for user: $USER in org: $ORG"
           
-          # Check if user is in admin team
-          ADMIN_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/orgs/$ORG/teams/admins/members/$USER" \
-            -w "%{http_code}")
+          # Check if user is organization owner first
+          OWNER_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/orgs/$ORG/members/$USER" | \
+            grep -o '"role":"[^"]*"' | cut -d'"' -f4)
           
-          # GitHub API returns 204 if user is in team, 404 if not
-          if [[ "$ADMIN_CHECK" == *"204"* ]]; then
+          if [[ "$OWNER_CHECK" == "admin" ]]; then
             echo "is_admin=true" >> $GITHUB_OUTPUT
-            echo "$USER is in the 'admins' team - full access granted"
+            echo "is_owner=true" >> $GITHUB_OUTPUT
+            echo "👑 $USER is organization owner - full admin access"
           else
-            echo "is_admin=false" >> $GITHUB_OUTPUT
-            echo "$USER is not in 'admins' team - checking developer permissions"
-            
-            # Check if user is in developers team
-            DEV_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-              "https://api.github.com/orgs/$ORG/teams/developers/members/$USER" \
+            # Check if user is in admin team
+            ADMIN_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/orgs/$ORG/teams/admins/members/$USER" \
               -w "%{http_code}")
             
-            if [[ "$DEV_CHECK" == *"204"* ]]; then
-              echo "is_developer=true" >> $GITHUB_OUTPUT
-              echo "$USER is in 'developers' team - restricted access"
+            # GitHub API returns 204 if user is in team, 404 if not
+            if [[ "$ADMIN_CHECK" == *"204"* ]]; then
+              echo "is_admin=true" >> $GITHUB_OUTPUT
+              echo "🔐 $USER is in the 'admins' team - full access granted"
             else
-              echo "is_developer=false" >> $GITHUB_OUTPUT
-              echo "WARNING: $USER is not in any recognized team"
+              echo "is_admin=false" >> $GITHUB_OUTPUT
+              echo "⚪ $USER is not in 'admins' team - checking developer permissions"
+              
+              # Check if user is in developers team
+              DEV_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                "https://api.github.com/orgs/$ORG/teams/developers/members/$USER" \
+                -w "%{http_code}")
+              
+              if [[ "$DEV_CHECK" == *"204"* ]]; then
+                echo "is_developer=true" >> $GITHUB_OUTPUT
+                echo "👨‍💻 $USER is in 'developers' team - restricted access"
+              else
+                echo "is_developer=false" >> $GITHUB_OUTPUT
+                echo "❌ WARNING: $USER is not in any recognized team"
+              fi
             fi
           fi
 
       - name: Validate team membership
         run: |
-          if [[ "${{ steps.check-permissions.outputs.is_admin }}" != "true" ]] && \
-             [[ "${{ steps.check-permissions.outputs.is_developer }}" != "true" ]]; then
+          if [[ "${{ steps.check-permissions.outputs.is_admin }}" == "true" ]]; then
+            echo "✅ User ${{ github.actor }} has admin access"
+          elif [[ "${{ steps.check-permissions.outputs.is_developer }}" == "true" ]]; then
+            echo "✅ User ${{ github.actor }} has developer access"
+          else
             echo "❌ ERROR: User ${{ github.actor }} is not in any authorized team"
             echo "Please ensure you are added to either:"
             echo "  - 'admins' team (full access)"
@@ -133,7 +147,11 @@ jobs:
       - name: Admin access confirmation
         if: steps.check-permissions.outputs.is_admin == 'true'
         run: |
-          echo "🔐 Admin team member detected - no path restrictions apply"
+          if [[ "${{ steps.check-permissions.outputs.is_owner }}" == "true" ]]; then
+            echo "👑 Organization owner detected - inherent admin access"
+          else
+            echo "🔐 Admin team member detected - no path restrictions apply"
+          fi
           echo ""
           echo "✅ Admin can modify any files including:"
           echo "   - protected-configs/"
