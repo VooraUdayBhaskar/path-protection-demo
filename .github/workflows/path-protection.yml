@@ -40,10 +40,10 @@ jobs:
           
           # Check if user is organization owner first
           OWNER_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/orgs/$ORG/members/$USER" | \
-            grep -o '"role":"[^"]*"' | cut -d'"' -f4)
+            "https://api.github.com/orgs/$ORG/members/$USER" -w "%{http_code}" | \
+            grep -o '"role":"admin"' || echo "")
           
-          if [[ "$OWNER_CHECK" == "admin" ]]; then
+          if [[ -n "$OWNER_CHECK" ]]; then
             echo "is_admin=true" >> $GITHUB_OUTPUT
             echo "is_owner=true" >> $GITHUB_OUTPUT
             echo "👑 $USER is organization owner - full admin access"
