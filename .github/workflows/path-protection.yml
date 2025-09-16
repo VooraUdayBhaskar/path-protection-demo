@@ -36,7 +36,7 @@ jobs:
         run: |
           USER="${{ github.actor }}"
           ORG="${{ github.repository_owner }}"
-          echo "Checking permissions for user: $USER in org: $ORG"
+          echo "Checking permissions for the user: $USER in org: $ORG"
           
           # Check if user is organization owner first
           OWNER_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
