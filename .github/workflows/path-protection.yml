@@ -1,84 +1,119 @@
 name: Path Protection - Developer Test
+
 on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   path-protection:
     runs-on: ubuntu-latest
+
+    # <-- make ORG_TOKEN available to steps (Org secret you created)
+    env:
+      ORG_TOKEN: ${{ secrets.ORG_TOKEN }}
+
     steps:
-    
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Fetch main branch
-        run: |
-          git fetch origin main
+        run: git fetch origin main
 
       - name: Get changed files
         id: changed-files
         run: |
+          set -euo pipefail
           echo "Getting files changed in this PR..."
           CHANGED_FILES=$(git diff --name-only origin/main..HEAD)
           echo "changed_files<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          
           echo "Files changed in this PR:"
           echo "$CHANGED_FILES"
+
+      - name: Check user team membership (org + teams)
+        id: check-permissions
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ORG_TOKEN:-}" ]]; then
+            echo "❌ ORG_TOKEN is not available to this repo. Add an Org secret named ORG_TOKEN."
+            exit 1
+          fi
+
+          API="https://api.github.com"
+          ORG="${{ github.repository_owner }}"
+          USER="${{ github.actor }}"
+          REPO="${{ github.repository }}"
+          PRNUM="${{ github.event.pull_request.number }}"
+          HDR="Authorization: Bearer $ORG_TOKEN"
+          ACC="Accept: application/vnd.github+json"
+
+          echo "🔎 Checking permissions for $USER in org $ORG"
+
+          # ---- Optional test hook: simulate developer via PR label ----
+          labels=$(curl -sS -H "$HDR" -H "$ACC" "$API/repos/$REPO/issues/$PRNUM/labels" | jq -r '.[].name')
+          if grep -qi '^simulate-developer$' <<<"$labels"; then
+            echo "🧪 Simulating developer role via label"
+            {
+              echo "is_admin=false"
+              echo "is_developer=true"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # ---- ORG ROLE (returns state + role) ----
+          org_status=$(curl -sS -o /tmp/org.json -w "%{http_code}" -H "$HDR" -H "$ACC" \
+            "$API/orgs/$ORG/memberships/$USER")
+          role=$(jq -r '.role  // empty' /tmp/org.json || true)
+          state=$(jq -r '.state // empty' /tmp/org.json || true)
+          echo "ℹ️  /memberships status: $org_status; role=$role state=$state"
+
+          is_admin=false
+          is_developer=false
+          is_owner=false
+
+          if [[ "$org_status" == "200" && "$state" == "active" && "$role" == "admin" ]]; then
+            is_admin=true
+            is_owner=true  # owners are reported with role=admin at org level
+            echo "👑 $USER is org admin/owner"
+          fi
+
+          # ---- TEAM MEMBERSHIPS (only check if not already admin) ----
+          if [[ "$is_admin" == "false" ]]; then
+            for team in admins developers; do
+              team_status=$(curl -sS -o /tmp/$team.json -w "%{http_code}" -H "$HDR" -H "$ACC" \
+                "$API/orgs/$ORG/teams/$team/memberships/$USER")
+              tstate=$(jq -r '.state // empty' /tmp/$team.json || true)
+              echo "ℹ️  /teams/$team/memberships status: $team_status; state=$tstate"
+
+              if [[ "$team_status" == "200" && "$tstate" == "active" ]]; then
+                echo "✅ $USER is ACTIVE in team: $team"
+                [[ "$team" == "admins" ]] && is_admin=true
+                [[ "$team" == "developers" ]] && is_developer=true
+              else
+                echo "⚪ $USER is NOT active in team: $team"
+              fi
+            done
+          fi
+
+          {
+            echo "is_admin=$is_admin"
+            echo "is_developer=$is_developer"
+            echo "is_owner=$is_owner"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Debug membership flags
         run: |
           echo "is_admin=${{ steps.check-permissions.outputs.is_admin }}"
           echo "is_developer=${{ steps.check-permissions.outputs.is_developer }}"
-
-      - name: Check user team membership
-        id: check-permissions
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          USER="${{ github.actor }}"
-          ORG="${{ github.repository_owner }}"
-          echo "Checking permissions for the user: $USER in org: $ORG"
-          
-          # Check if user is organization owner first
-          OWNER_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/orgs/$ORG/members/$USER" -w "%{http_code}" | \
-            grep -o '"role":"admin"' || echo "")
-          
-          if [[ -n "$OWNER_CHECK" ]]; then
-            echo "is_admin=true" >> $GITHUB_OUTPUT
-            echo "is_owner=true" >> $GITHUB_OUTPUT
-            echo "👑 $USER is organization owner - full admin access"
-          else
-            # Check if user is in admin team
-            ADMIN_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-              "https://api.github.com/orgs/$ORG/teams/admins/members/$USER" \
-              -w "%{http_code}")
-            
-            # GitHub API returns 204 if user is in team, 404 if not
-            if [[ "$ADMIN_CHECK" == *"204"* ]]; then
-              echo "is_admin=true" >> $GITHUB_OUTPUT
-              echo "🔐 $USER is in the 'admins' team - full access granted"
-            else
-              echo "is_admin=false" >> $GITHUB_OUTPUT
-              echo "⚪ $USER is not in 'admins' team - checking developer permissions"
-              
-              # Check if user is in developers team
-              DEV_CHECK=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-                "https://api.github.com/orgs/$ORG/teams/developers/members/$USER" \
-                -w "%{http_code}")
-              
-              if [[ "$DEV_CHECK" == *"204"* ]]; then
-                echo "is_developer=true" >> $GITHUB_OUTPUT
-                echo "👨‍💻 $USER is in 'developers' team - restricted access"
-              else
-                echo "is_developer=false" >> $GITHUB_OUTPUT
-                echo "❌ WARNING: $USER is not in any recognized team"
-              fi
-            fi
-          fi
+          echo "is_owner=${{ steps.check-permissions.outputs.is_owner }}"
 
       - name: Validate team membership
         run: |
@@ -91,62 +126,44 @@ jobs:
             echo "Please ensure you are added to either:"
             echo "  - 'admins' team (full access)"
             echo "  - 'developers' team (restricted access)"
-            echo ""
-            echo "Contact your organization admin to add you to appropriate teams."
             exit 1
           fi
 
-      - name: Validate developer access restrictions
+      - name: Enforce developer path restrictions
         if: steps.check-permissions.outputs.is_admin == 'false' && steps.check-permissions.outputs.is_developer == 'true'
         run: |
+          set -euo pipefail
           echo "Applying developer access restrictions..."
-          
-          # Define protected paths that developers cannot modify
+
           PROTECTED_PATHS=(
             "protected-configs/"
             "scripts/deployment/"
             "secrets/"
             ".github/workflows/"
           )
-          
+
           VIOLATIONS=""
-          
-          # Check each changed file against protected paths
           while IFS= read -r file; do
-            if [[ -n "$file" ]]; then
-              echo "Checking file: $file"
-              for pattern in "${PROTECTED_PATHS[@]}"; do
-                if [[ "$file" == $pattern* ]] || [[ "$file" == *"$pattern"* ]]; then
-                  echo "⚠️  VIOLATION: $file matches restricted pattern: $pattern"
-                  VIOLATIONS="$VIOLATIONS\n- $file (matches pattern: $pattern)"
-                fi
-              done
-            fi
+            [[ -z "$file" ]] && continue
+            echo "Checking file: $file"
+            for pattern in "${PROTECTED_PATHS[@]}"; do
+              if [[ "$file" == "$pattern"* ]]; then
+                echo "⚠️  VIOLATION: $file matches restricted pattern: $pattern"
+                VIOLATIONS="${VIOLATIONS}\n- $file (matches pattern: $pattern)"
+              fi
+            done
           done <<< "${{ steps.changed-files.outputs.changed_files }}"
-          
-          # If violations found, block the PR
+
           if [[ -n "$VIOLATIONS" ]]; then
             echo ""
             echo "🚫 ACCESS DENIED: Developers cannot modify PROTECTED paths"
             echo "=============================================="
             echo -e "Restricted files in this PR:$VIOLATIONS"
-            echo ""
-            echo "📋 To resolve this issue:"
-            echo "   1. Remove changes to PROTECTED files from your PR, OR"
-            echo "   2. Ask an admin team member to create this PR instead, OR"
-            echo "   3. Move changes to protected folders into a separate admin-only PR"
-            echo ""
-            echo "✅ You CAN modify files in:"
-            echo "   - public-configs/"
-            echo "   - scripts/dev-tools/"
-            echo "   - src/, docs/, README.md and documentation"
-            echo "   - Most application code outside protected areas"
             echo "=============================================="
             exit 1
           fi
-          
-          echo "✅ All changed files are accessible to developers"
-          echo "📝 PR approved for developer access level"
+
+          echo "✅ No protected paths touched. OK for developers."
 
       - name: Admin access confirmation
         if: steps.check-permissions.outputs.is_admin == 'true'
@@ -156,17 +173,8 @@ jobs:
           else
             echo "🔐 Admin team member detected - no path restrictions apply"
           fi
-          echo ""
-          echo "✅ Admin can modify any files including:"
-          echo "   - protected-configs/"
-          echo "   - scripts/deployment/"
-          echo "   - secrets/"
-          echo "   - .github/workflows/"
-          echo "   - All other folders"
-          echo ""
-          echo "📁 Files that will be modified in this PR:"
+
+          echo "📁 Files in this PR:"
           while IFS= read -r file; do
-            if [[ -n "$file" ]]; then
-              echo "   - $file"
-            fi
+            [[ -n "$file" ]] && echo "   - $file"
           done <<< "${{ steps.changed-files.outputs.changed_files }}"
