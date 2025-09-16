@@ -28,6 +28,10 @@ jobs:
           
           echo "Files changed in this PR:"
           echo "$CHANGED_FILES"
+      - name: Debug membership flags
+        run: |
+          echo "is_admin=${{ steps.check-permissions.outputs.is_admin }}"
+          echo "is_developer=${{ steps.check-permissions.outputs.is_developer }}"
 
       - name: Check user team membership
         id: check-permissions
