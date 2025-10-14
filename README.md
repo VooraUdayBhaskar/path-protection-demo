@@ -1,3 +1,146 @@
+# 0) Setup & Prereqs (one-time)
+
+This section prepares GitHub and Auth0 so the CI policy gates and Terraform flows can run securely per environment.
+
+---
+
+## 0.1 Create GitHub Teams (RBAC)
+
+Create the following teams in your GitHub org:
+
+- **@uday-test/ciam-core**
+  - Purpose: platform owners (full repo + prod controls).
+  - Minimum permissions: Maintain (or Admin).
+
+- **@uday-test/team-app1**
+  - Purpose: app1 developers (dev-only app path).
+  - Permissions: Write on repo.
+
+- **@uday-test/team-app1-reviewers**
+  - Purpose: required reviewers for app1 paths.
+  - Permissions: Triage or Write.
+
+- **@uday-test/team-app2 / @uday-test/team-app2-reviewers**
+  - Same as app1 for app2.
+
+> Keep the names exactly as referenced in CODEOWNERS and `base/policies/path_guard.rego`.
+
+### Branch protection & required reviews
+
+Protect **main** branch:
+
+- Require PRs.
+- Require status checks to pass: **PR Checks (Conftest)**, **Terraform Check**.
+- Require CODEOWNERS reviews (e.g., 1–2 approvals).
+- Dismiss stale approvals on new commits (recommended).
+
+---
+
+## 0.2 Create GitHub Environments & Secrets (per-env)
+
+Create GitHub **Environments**: `dev`, `qa`, `prod`. Add environment-scoped secrets:
+
+### Auth0 deployer M2M (per environment)
+- `DEV_AUTH0_DOMAIN` / `QA_AUTH0_DOMAIN` / `PROD_AUTH0_DOMAIN`
+  - Example: `tenant-dev.us.auth0.com`
+- `DEV_AUTH0_CLIENT_ID` / `QA_AUTH0_CLIENT_ID` / `PROD_AUTH0_CLIENT_ID`
+- `DEV_AUTH0_CLIENT_SECRET` / `QA_AUTH0_CLIENT_SECRET` / `PROD_AUTH0_CLIENT_SECRET`
+
+### Optional: smoke test-only client (if different than deployer)
+- `DEV_SMOKE_CLIENT_ID`, `DEV_SMOKE_CLIENT_SECRET` (and equivalents for QA/PROD if you choose to run smoke there)
+
+
+> Use **Environment secrets** (not repository secrets) so jobs run only with the minimum needed credentials for that environment.
+
+---
+
+## 0.3 Create/Configure Auth0 M2M Clients (per-env)
+
+In each Auth0 tenant (`dev` / `qa` / `prod`):
+
+1. Create an M2M application **“Terraform Deployer – <env>”**.
+2. Grant **Management API scopes** needed for resources you manage (principle of least privilege). Common examples:
+
+```
+read:clients, create:clients, update:clients
+read:connections, create:connections, update:connections
+read:tenant_settings, update:tenant_settings
+read:guardian_factors, update:guardian_factors
+read:branding, update:branding
+```
+
+3. Copy **Domain**, **Client ID**, **Client Secret** into the matching GitHub environment secrets above.
+4. Validate with the smoke workflow (`ci-smoke.yml`) before enabling auto-deploys.
+
+---
+
+## 0.4 Organization Token (GitHub) – Fine-grained PAT for org lookups
+
+Some workflows (e.g., enriching reviewer/team checks or calling GitHub APIs beyond the default GITHUB_TOKEN capabilities) may need an org-scoped token.
+
+### Configuration
+
+- **Secret name:** `ORG_TOKEN`
+- **Location:** Store once in the `dev` environment (usable across all workflows)
+- **Type:** Fine-grained PAT (preferred)
+- **Owner:** Service or bot account
+- **Access scopes:**
+  - Read access to repository metadata
+  - Read access to organization members
+- **Repository access:** Restrict to `auth0-domain1` repo only
+
+> Many checks will work with `GITHUB_TOKEN`. Add `ORG_TOKEN` only if your policy/check scripts call endpoints that require elevated scopes (e.g., team membership introspection).
+
+---
+
+## 0.5 Name & Path Conventions (consumed by policies)
+
+- **Teams** must match `CODEOWNERS` and `path_guard.rego` mappings:
+  - `team-app1` ↔ paths: `/apps/app1/**`, `/tenants/dev/**`
+  - `team-app2` ↔ paths: `/apps/app2/**`, `/tenants/dev/**`
+  - `ciam-core` ↔ full repo
+- **Environments:** `dev`, `qa`, `prod` (used in tenant overlays and policy env detection)
+- **Secret names:** Must follow the `ENV_*` convention exactly as used in workflows.
+
+---
+
+## 0.6 GitHub Actions permissions & runners
+
+- **Settings → Actions:**  
+  - Workflow permissions: “Read and write” (needed to post checks, comments, artifacts).
+  - Allow GitHub Actions to create and approve pull requests from GitHub Apps: optional.
+- **Runners:** `ubuntu-latest` is assumed.  
+  (If self-hosted, ensure `conftest`, `yq`, and `terraform` can be installed.)
+
+---
+
+## 0.7 Tooling versions (baseline)
+
+| Tool | Version | Notes |
+|------|----------|--------|
+| Conftest | v0.62.0 | Used in workflows |
+| yq | v4.x | Scripts expect yq v4 CLI |
+| Terraform | 1.6.x | Matches setup-terraform version |
+| OPA/Rego | v1 | Align imports with Rego v1 syntax |
+
+---
+
+## 0.8 Quick validation checklist
+
+- [x] Teams created; membership set.
+- [x] Branch protection on `main` with required checks & CODEOWNERS reviews.
+- [x] GitHub Environments created with correct secrets per env.
+- [x] Auth0 M2M created per env with least-privilege scopes and secrets saved.
+- [x] (Optional) `ORG_TOKEN` secret set if org lookups are needed.
+- [x] Smoke test workflow completes successfully.
+- [x] PR checks block cross-app edits and prod edits by non-core members.
+
+---
+
+
+
+
+
 # Auth0-Domain1 – Repository & Policy-Driven CI/CD Documentation
 
 > This document explains the repository layout, the purpose of each folder, the policy standards being enforced, and exactly how pull requests (PRs) trigger checks and deployment. All references below map to files present in this repository.
