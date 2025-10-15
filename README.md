@@ -1,6 +1,6 @@
 # Auth0-Domain1 – Repository & Policy-Driven CI/CD Documentation
 
-## 📘 Table of Contents
+##  Table of Contents
 1. [High-level Overview](#1-high-level-overview)
 2. [Repository Layout & Purpose](#2-repository-layout--purpose)
 3. [Ownership, RBAC, and Path Guard](#3-ownership-rbac-and-path-guard)
@@ -266,7 +266,7 @@ This ensures the right reviewers must approve changes in app- or platform-owned 
   - Branding, database connection, Guardian/MFA policy, and app/client configuration derived from baseline inputs.
 - **Outputs:** Helpful values like database connection ID, MFA policy state, etc., are surfaced by `output {}` blocks.
 
-> **State:** Use a secure remote backend in production. (The sample includes local artifacts; for real environments configure Terraform Cloud, S3 + DynamoDB, etc.)
+> **State:** Use a secure remote backend in production. (This POC includes local artifacts for storing the terraform state file; for real environments configure Terraform Cloud, S3 + DynamoDB, etc.)
 
 ---
 
