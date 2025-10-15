@@ -24,14 +24,14 @@
 11. [Operational Notes](#11-operational-notes)
     - [Appendix – File Pointers (non‑exhaustive)](#appendix--file-pointers-nonexhaustive)
 12. [Setup & Prereqs (one-time)](#12-setup--prereqs-one-time)
-   - [12.1 Create GitHub Teams (RBAC)](#121-create-github-teams-rbac)
-   - [12.2 Create GitHub Environments & Secrets (per-env)](#122-create-github-environments--secrets-per-env)
-   - [12.3 Create/Configure Auth0 M2M Clients (per-env)](#123-createconfigure-auth0-m2m-clients-per-env)
-   - [12.4 Organization Token (GitHub) – Fine-grained PAT for org lookups](#124-organization-token-github--fine-grained-pat-for-org-lookups)
-   - [12.5 Name & Path Conventions (consumed by policies)](#125-name--path-conventions-consumed-by-policies)
-   - [12.6 GitHub Actions permissions & runners](#126-github-actions-permissions--runners)
-   - [12.7 Tooling versions (baseline)](#127-tooling-versions-baseline)
-   - [12.8 Quick validation checklist](#128-quick-validation-checklist)
+      - [12.1 Create GitHub Teams (RBAC)](#121-create-github-teams-rbac)
+      - [12.2 Create GitHub Environments & Secrets (per-env)](#122-create-github-environments--secrets-per-env)
+      - [12.3 Create/Configure Auth0 M2M Clients (per-env)](#123-createconfigure-auth0-m2m-clients-per-env)
+      - [12.4 Organization Token (GitHub) – Fine-grained PAT for org lookups](#124-organization-token-github--fine-grained-pat-for-org-lookups)
+      - [12.5 Name & Path Conventions (consumed by policies)](#125-name--path-conventions-consumed-by-policies)
+      - [12.6 GitHub Actions permissions & runners](#126-github-actions-permissions--runners)
+      - [12.7 Tooling versions (baseline)](#127-tooling-versions-baseline)
+      - [12.8 Quick validation checklist](#128-quick-validation-checklist)
 
 ---
 
