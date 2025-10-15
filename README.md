@@ -255,7 +255,7 @@ This ensures the right reviewers must approve changes in app- or platform-owned 
 
 **Behavior:**
 - Exchanges the configured M2M client credentials for an Auth0 **access token** to verify secrets are valid and the tenant is reachable.
-
+> For now I am deploying it to the dev environemtn using the dev credetntials stored in my environement variables of my repository.
 ---
 
 ## 6) Terraform – What Actually Gets Applied
@@ -459,7 +459,7 @@ Some workflows (e.g., enriching reviewer/team checks or calling GitHub APIs beyo
   - Read access to organization members
 - **Repository access:** Restrict to `auth0-domain1` repo only
 
-> Many checks will work with `GITHUB_TOKEN`. Add `ORG_TOKEN` only if your policy/check scripts call endpoints that require elevated scopes (e.g., team membership introspection).
+> Add `ORG_TOKEN` to retrieve the github team membership.
 
 ---
 
