@@ -2,7 +2,7 @@
 
 ##  Table of Contents
 1. [High-level Overview](#1-high-level-overview)
-2. [Repository Layout & Purpose](#2-repository-layout--purpose)
+2. [Repository Layout](#2-repository-layout--purpose)
 3. [Ownership, RBAC, and Path Guard](#3-ownership-rbac-and-path-guard)
    - [3.1 CODEOWNERS (team-based review control)](#31-codeowners-team-based-review-control)
    - [3.2 PR Path Guard (OPA)](#32-pr-path-guard-opa)
