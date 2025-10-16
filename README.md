@@ -37,13 +37,17 @@
 
 ## 1) High-level Overview
 
-This repo codifies Auth0 tenant/app configuration and security standards as code. It uses:
+This repository codifies **Auth0 tenant and application configuration**, along with **security and compliance standards**, entirely as code.  
+It integrates **policy-as-code**, **CI/CD automation**, and **Terraform-based infrastructure management** to ensure every configuration change is reviewable, validated, and reproducible.
 
-- **OPA/Rego** policies with **Conftest** to validate YAML configuration against standards.
-- **GitHub Actions** to enforce path ownership, validate baseline, tenant, and app-level configs, and perform Terraform checks/deploys.
-- **Terraform** to apply approved baseline configurations to an Auth0 tenant using an M2M client.
+It uses:
 
-> Primary CI jobs live in `.github/workflows/` and policies live under `base/**`, `tenants/**`, and `overlays/**`.
+- **[OPA/Rego policies](#4-standards--policies--whats-checked-against-what)** with **Conftest** to validate YAML configuration files against defined standards before deployment.  
+- **[GitHub Actions workflows](#5-cicd--what-runs-on-each-pr--push)** to enforce [path ownership and RBAC](#3-ownership-rbac-and-path-guard), validate [baseline configurations](#41-baseline-standards-vs-baseline-configs), [tenant overlays](#42-tenant-level-standards-per-env-overlays), and [application-level settings](#43-app-level-standards-vs-app-configs), while automating Terraform checks and deployments.  
+- **[Terraform automation](#6-terraform--what-actually-gets-applied)** to apply validated and approved baseline configurations directly to Auth0 tenants using environment-specific M2M credentials.
+
+> Primary CI/CD jobs reside in [`.github/workflows/`](#5-cicd--what-runs-on-each-pr--push), and policies live under  
+> [`base/**`](#41-baseline-standards-vs-baseline-configs), [`tenants/**`](#42-tenant-level-standards-per-env-overlays), and [`overlays/**`](#44-enterprise-shared-security-overlay).
 
 ---
 
