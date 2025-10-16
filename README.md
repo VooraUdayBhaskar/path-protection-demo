@@ -11,7 +11,7 @@
    - [4.2 Tenant-Level Standards (per-env overlays)](#42-tenant-level-standards-per-env-overlays)
    - [4.3 App-Level Standards vs App Configs](#43-app-level-standards-vs-app-configs)
    - [4.4 Enterprise Shared Security Overlay](#44-enterprise-shared-security-overlay)
-5. [CI/CD – What Runs on Each PR & Push](#5-cicd--what-runs-on-each-pr--push)
+5. [CI/CD – What Runs on Each PR & Push | Workflows](#5-cicd--what-runs-on-each-pr--push)
    - [5.1 PR Checks (Conftest) – `.github/workflows/pr-checks.yml`](#51-pr-checks-conftest---githubworkflowspr-checksyml)
    - [5.2 Terraform Check – `.github/workflows/terraform-check.yml`](#52-terraform-check---githubworkflowsterraform-checkyml)
    - [5.3 Deploy to Auth0 (Dev) – `.github/workflows/terraform-deploy.yml`](#53-deploy-to-auth0-dev---githubworkflowsterraform-deployyml)
